@@ -1,0 +1,243 @@
+them=$1
+me=$(/serval/servald keyring list | tail -1 | cut -f1 -d:)
+
+lastoffset=$2
+readoffset=$3
+
+reboot=0
+
+monitor=0
+for monitorsid in $(cat /dos/monitor.sid); do
+    if [ "$monitorsid" == "$them" ]; then
+        echo "This user is a monitor"
+        monitor=1
+    fi
+done
+
+helpdesk=0
+for helpdesksid in $(cat /dos/helpdesk.sid); do
+    if [ "$helpdesk" == "$them" ]; then
+        echo "This user is a helpdesk supporter"
+        helpdesk=1
+    fi
+done
+
+subscriber=0
+for subscribersid in $(cat /dos/subscribers.sid); do
+    if [ "$subscribersid" == "$them" ]; then
+	echo "This user is subscribed"
+	subscriber=1
+    fi
+done  
+
+rm /tmp/messages
+/serval/servald meshms list messages $me $them  | awk -F: '{ if ($4 == "<" && $2 > '$readoffset') print $5; }' | sed -e 's/[^a-z|A-Z|0-9| ]//g' -e 's/ /./g' | sed -n '1!G;h;$p' >/tmp/messages
+for command in $(cat /tmp/messages); do
+    action="$(echo $command | cut -f1 -d. | tr '[A-Z]' '[a-z]')"
+    arg=$(echo $command | sed -e 's/^[^\.]*//' -e 's/\.//g')
+    echo $action:$arg
+    case $action in
+        help ) # Display list of commands this unit understands
+	        if [ "$monitor" == 1 ]; then
+	            message="I am a Serval Mesh Extender, Master. I will obey the following commands: \n"$(cat $0 | grep " )" | grep -v grep)
+		elif [ "$helpdesk" == 1 ]; then
+		    message="I am a Serval Mesh Extender. I know the following commands: "$(cat $0 | grep " )" | grep -v grep | grep -v "requires authorisation")
+		else
+		    message="I am a Serval Mesh Extender. I know the following commands: "$(cat $0 | grep " )" | grep -v grep | grep -v "requires authorisation|for helpdesk")
+		fi
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        helpsay ) # Reply to a helpdesk message (for helpdesk operators only)
+		# Actually, nothing to do here: it is all implicit.
+	        # (see /etc/serval/otaupdate to see how it works)
+	        # So just tell the user if they aren't the helpdesk, and thus can't
+	        # use it.
+		if [ $helpdesk == 1 ]; then
+		    message="Help reply published"
+		else
+                    message="You are not authorised to use this function"
+	        fi
+		/serval/servald meshms send message $me $them "${message}"
+		;;
+        version ) # Display version of Serval core, and last applied OTA update
+                message="Serval Mesh version: "$(/serval/servald version | head -1)", Last OTA update: "$(cat /serval-var/ota-version.txt)
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        peers ) # Display list of peers reachable at this moment
+		message="My peers are: $(/serval/servald id peers)"
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        date ) # Display what time / date this unit thinks it is
+                message="I think the time is "$(date)
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        setname ) # Change the name of this node (requires authorisation)
+               if [ "$monitor" == 1 ]; then
+                   if [ -z ${arg} ]; then
+                       message="Please provide a new name. For example: setname newnamehere"
+                   else
+                       message="Renaming node to ${arg}. The device will now reboot."
+
+                       /serval/servald stop
+                       sleep 1
+
+                       /serval/servald keyring set did $(/serval/servald keyring list | tail -1 | cut -f1 -d:) "${arg}" "$(/serval/servald keyring list | tail -1 | cut -f3 -d:)"
+
+                       sleep 5
+                       reboot=1
+                    fi
+                else
+                    message="You are not authorised to use this function"
+                fi
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        setnumber ) # Change the phone number of this node (requires authorisation)
+	       if [ "$monitor" == 1 ]; then
+		    if [ -z ${arg} ]; then
+			message="Please provide a new number. For example: setnumber 0123456789"
+		    else
+		   	message="Renumbering node to ${arg}. The device will now reboot."
+		  
+		    	/serval/servald stop
+		    	sleep 1
+
+		    	/serval/servald keyring set did $(/serval/servald keyring list | tail -1 | cut -f1 -d:) "${arg}" "$(/serval/servald keyring list | tail -1 | cut -f3 -d:)"
+
+		        sleep 5
+		        reboot=1
+                    fi
+	        else
+		    message="You are not authorised to use this function"
+		fi
+		/serval/servald meshms send message $me $them "${message}"
+                ;;
+        reboot ) # Reboot node (requires authorisation)
+	       if [ "$monitor" == 1 ]; then
+		    message="Rebooting node in 5 seconds"
+		    /serval/servald meshms send message $me $them "${message}"
+		    sleep 5
+		    reboot=1
+	        else
+		    message="You are not authorised to use this function"
+		    /serval/servald meshms send message $me $them "${message}"
+		fi		
+                ;;
+        wifioff ) # Disable ad-hoc wifi (requires authorisation)
+	       if [ "$monitor" == 1 ]; then
+		    message="Disabling ad-hoc wifi; only UHF packet radio will be available for talking to other Mesh Extenders"
+		    /serval/servald meshms send message $me $them "${message}"
+		    touch /dos/nomesh
+	        else
+		    message="You are not authorised to use this function"
+		    /serval/servald meshms send message $me $them "${message}"
+		fi		
+                ;;
+        wifion ) # Enable ad-hoc wifi (requires authorisation)
+	       if [ "$monitor" == 1 ]; then
+		    message="Enabling ad-hoc wifi"
+		    /serval/servald meshms send message $me $them "${message}"
+		    if [ -e /dos/nomesh ]; then
+		    	rm /dos/nomesh
+		    fi
+	        else
+		    message="You are not authorised to use this function"
+		    /serval/servald meshms send message $me $them "${message}"
+		fi	 	
+                ;;
+        uhfoff ) # Disable UHF packet radio (requires authorisation)
+	       if [ "$monitor" == 1 ]; then
+		    message="Disabling UHF packet radio; only ad-hoc wifi will be available for talking to other Mesh Extenders"
+		    /serval/servald meshms send message $me $them "${message}"
+		    touch /dos/nouhf
+	        else
+		    message="You are not authorised to use this function"
+		    /serval/servald meshms send message $me $them "${message}"
+		fi
+                ;;
+        uhfon ) # Enable UHF packet radio (requires authorisation)
+	       if [ "$monitor" == 1 ]; then
+		    message="Enabling UHF packet radio"
+		    /serval/servald meshms send message $me $them "${message}"
+		    if [ -e /dos/nouhf ]; then
+		    	rm /dos/nouhf
+		    fi
+	        else
+		    message="You are not authorised to use this function"
+		    /serval/servald meshms send message $me $them "${message}"
+		fi
+                ;;
+        wifissid ) # Change SSID of ad-hoc wifi (requires reboot)
+	       if [ "$monitor" == 1 ]; then
+		    echo "New SSID: '$arg'"
+		    if [ -n "$arg" ]; then
+		  	echo $arg > /dos/apssid
+			message="Changing wifi SSID to ${arg}. The device will now reboot."
+		    else
+			rm /dos/apssid
+			message="Reseting wifi SSID. Will take effect after reboot"
+		    fi
+		    # Kill lbard, so that /etc/serval/runlbard goes through the loop
+		    # and checks the contents of this file
+		    kill $(ps | grep lbard | grep -v runlbard | grep -v grep | awk '{ print $1; }')
+		  
+		    reboot=1	
+	        else
+		    message="You are not authorised to use this function"
+		fi
+		/serval/servald meshms send message $me $them "${message}"
+                ;;
+        subscribe ) # Subscribe to recieve updated from this node
+		if [ "$subscriber" == 1 ]; then
+		    message="You are already subscribed to this node"
+		else
+		    echo $them >> /dos/subscribers.sid
+		    message="You are now subscribed to this node"
+		fi
+
+		/serval/servald meshms send message $me $them "${message}"
+		;;
+        unsubscribe ) # Unsubscribe to stop recieving updated from this node
+		if [ "$subscriber" == 1 ]; then
+		    sed -i /$them/d /dos/subscribers.sid		    
+		    message="You have successfully unsubscribed from this node"
+		else
+		   message="You are not subscribed to this node"
+		fi
+
+		/serval/servald meshms send message $me $them "${message}"
+		;;
+        admin ) # Become an administrator. For demonstration purposes only.
+                if [ "$monitor" == 1 ]; then
+                  message="You are already an administrator"
+                else
+                  echo $them >> /dos/monitor.sid
+                  message="You are now an administrator for this node"
+                fi
+
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        unadmin ) # Remove administrator privileges. For demonstration purposes only.
+                if [ "$monitor" == 1 ]; then
+                  sed -i /$them/d /dos/monitor.sid
+                  message="You no longer an administrator of this node"
+                else
+                  message="You are not an administrator for this node"
+                fi
+
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        *)
+                /serval/servald meshms send message $me $them "Sorry, I don't understand '$action$'. Message 'help' for more information."
+                ;;
+   esac
+done
+
+# Mark these messages as read
+/serval/servald meshms read messages $me $them $lastoffset
+
+# Reboot the device if necessary                                                                     
+if [ $reboot == 1 ]; then                                                                           
+  reboot                                                                                             
+fi
+
+

@@ -1,0 +1,233 @@
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=serval-dna
+PKG_VERSION:=MESHEXTENDER-20160504.1051.39
+PKG_RELEASE:=45
+
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/servalproject/serval-dna.git
+PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+PKG_SOURCE_VERSION:=c78ee668d5a08ca4f528a4260de384aaa2a06fed
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+
+PKG_FIXUP:=autoreconf
+
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+PKG_BUILD_DEPENDS:=
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/serval-dna
+	TITLE:=Serval DNA mesh networking daemon
+	SECTION:=net
+	CATEGORY:=Network
+	SUBMENU:=Mesh networking
+	DEPENDS:=+librt +fdisk +libext2fs +e2fsprogs +libcom_err
+	MAINTAINER:=Serval DNA Maintainer <serval-dna@servalproject.org>
+endef
+
+define Package/serval-dna/description
+  Serval DNA is a daemon that implements the Serval Mesh network protocol as an
+  overlay network encapsulated within UDP/IP packets over Wi-Fi.  The daemon,
+  when running, joins the OpenWRT router to the local Serval Mesh Wi-Fi
+  network.  This allows it to participate in dynamic mesh routing (using
+  Serval's own mesh routing protocol), file distribution (using the Rhizome
+  store-and-forward protocol), secure text messaging (using the MeshMS
+  protocol), and to relay secure voice calls (using the VoMP voice-over-mesh
+  protocol) and other secure Serval traffic (such as tunnelled SOCKS proxy
+  connections) between Android devices running the Serval Mesh app.
+
+  The Serval Mesh Extender device is essentially a Wi-Fi router running the
+  Serval DNA daemon on OpenWRT.
+endef
+
+define Package/serval-dna/preinst
+#!/bin/sh
+echo "Please insert a USB you wish to configure."
+echo "WARNING: This will erase everything on the USB."
+while true; do
+    read -p "Do you wish to continue? [y/n] " yn
+    case $$yn in
+        y ) echo "Partitioning USB."
+            # Discover which USB drive was plugged in
+            dmesglog=$$(dmesg | tail -n 15 | grep "Attached SCSI removable disk")
+            for driveletter in a b c d; do
+                if [ "$$(echo "$$dmesglog" | grep sd$$driveletter | wc -l)" != 0 ]; then
+                    attached="sd$$driveletter"
+                    echo "USB is recognised as $$attached"
+                    break
+                fi
+            done
+
+            if [ ! -e /dev/$$attached ]; then
+                echo "No USB attached. Please insert a USB and try again."
+                return 1
+            fi
+
+            # Check if the disk is mounted anywhere
+            mounts=`mount | grep /dev/$$attached | wc -l`
+            if [[ $$mounts != 0 ]]; then
+                echo "That disk is mounted.  Unmounting."
+                umount /dev/$$attached"1"
+                umount /dev/$$attached"2"
+                umount /dev/$$attached"3"
+            fi
+
+            fdisk /dev/$$attached <<EOF
+            d
+            1
+            d
+            2
+            d
+            3
+            d
+            4
+            n
+            p
+            1
+
+            +1G
+            n
+            p
+            2
+
+            +1G
+            n
+            p
+            3
+
+
+            w
+EOF
+            echo
+            echo
+            echo
+            echo "Finished fdisk: remove and re-insert memory stick and run populate-memory-stick."
+            read -p "Please remove and re-insert the memory stick. Type y then [enter] to continue. " continue
+            if [ "$$continue" == "y" ]; then
+                echo "Formatting partitions."
+
+		# Discover which USB drive was plugged in
+		dmesglog=$(dmesg | tail -n 15 | grep "Attached SCSI removable disk")
+		for driveletter in a b c d; do
+        	    if [ "$$(echo "$$dmesglog" | grep sd$$driveletter | wc -l)" != 0 ]; then
+			attached="sd$$driveletter"
+			echo "USB is recognised as $$attached"
+			break		
+        	    fi
+		done
+
+                # Unmount and format partitions
+                umount /dev/$$attached"1"
+                umount /dev/$$attached"2"
+                umount /dev/$$attached"3"
+                mkfs.ext4 /dev/$$attached"1" -L dos
+                mkfs.ext4 /dev/$$attached"2" -L serval
+                mkfs.ext4 /dev/$$attached"3" -L serval-var
+
+                # Mount the USB partitions
+                mkdir /dos
+                mkdir /serval
+                mkdir /serval-var
+                mount -t ext4 /dev/$$attached"1" /dos
+                mount -t ext4 /dev/$$attached"2" /serval
+                mount -t ext4 /dev/$$attached"3" /serval-var
+            else
+                echo "Cannot finish install without configuring USB."
+                echo "Cancelling install"
+                return 1
+            fi
+            return 0
+            ;;
+        n ) echo "Cancelling install."
+            return 1
+            ;;
+        * ) echo "Please answer y or n."
+            ;;
+    esac
+done
+exit 0
+endef
+
+define Package/serval-dna/postinst
+#!/bin/sh
+# Check if we are on real system
+if [ -z "$${IPKG_INSTROOT}" ]; then
+        echo "Enabling rc.d symlink for servald"
+        /etc/init.d/servald enable
+	echo "Enabling rc.d symlink for wirelesssetup"
+	/etc/init.d/wirelesssetup enable
+	#echo "Enabling rc.d symlink for captiveportal"
+	#/etc/init.d/captiveportal enable
+	#echo "Enabling rc.d symling for chilli"
+	#/etc/init.d/chilli enable
+fi
+exit 0
+endef
+
+define Package/serval-dna/prerm
+#!/bin/sh
+# check if we are on real system
+if [ -z "$${IPKG_INSTROOT}" ]; then
+        echo "Removing rc.d symlink for servald"
+        /etc/init.d/servald disable
+	echo "Removing rc.d symlink for wirelesssetup"
+	/etc/init.d/wirelesssetup disable
+	#echo "Removing rc.d symlink for capriveportal
+	#/etc/init.d/captiveportal disabe
+	#echo "Removing rc.d symlink for chilli"
+	#/etc/init.d/chilli disable
+fi
+exit 0
+endef
+
+define Build/Configure
+	echo "$(PKG_VERSION)" >$(PKG_BUILD_DIR)/$(CONFIGURE_PATH)/$(strip $(3))/VERSION.txt
+	$(call Build/Configure/Default,$(1),$(2),$(3))
+endef
+
+define Package/serval-dna/install
+	$(INSTALL_DIR) $(1)/serval
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/servald $(1)/serval
+
+	$(INSTALL_DIR) $(1)/serval/www
+	$(INSTALL_DATA) ./files/serval/www/index.html $(1)/serval/www
+	$(INSTALL_DATA) ./files/serval/www/index-helpdesk-template.html $(1)/serval/www
+	$(INSTALL_DATA) ./files/serval/www/index-nohelpdesk-template.html $(1)/serval/www
+	
+	$(INSTALL_DIR) $(1)/serval/www/software/android
+	$(INSTALL_DATA) ./files/serval/www/software/android/servalmesh.apk $(1)/serval/www/software/android/servalmesh.apk
+
+	$(INSTALL_DIR) $(1)/etc
+	$(INSTALL_DATA) ./files/etc/profile $(1)/etc
+	$(INSTALL_DATA) ./files/etc/banner $(1)/etc
+	
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_DATA) ./files/etc/config/fstab $(1)/etc/config
+	$(INSTALL_DATA) ./files/etc/config/network.template $(1)/etc/config
+	$(INSTALL_DATA) ./files/etc/config/system $(1)/etc/config
+	$(INSTALL_DATA) ./files/etc/config/wireless.template $(1)/etc/config
+	$(INSTALL_DATA) ./files/etc/config/dhcp $(1)/etc/config
+	#$(INSTALL_DATA) ./files/etc/config/uhttpd $(1)/etc/config
+
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/etc/init.d/servald $(1)/etc/init.d
+	#$(INSTALL_BIN) ./files/etc/init.d/captiveportal $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/etc/init.d/wirelesssetup $(1)/etc/init.d
+	#$(INSTALL_BIN) ./files/etc/init.d/chilli $(1)/etc/init.d
+
+	$(INSTALL_DIR) $(1)/etc/serval
+	$(INSTALL_BIN) ./files/etc/serval/runservald $(1)/etc/serval
+	$(INSTALL_BIN) ./files/etc/serval/otaupdate $(1)/etc/serval/otaupdate
+	$(INSTALL_BIN) ./files/etc/serval/meshmsresponder $(1)/etc/serval/meshmsresponder
+	$(INSTALL_BIN) ./files/etc/serval/testing $(1)/etc/serval/testing
+	$(INSTALL_BIN) ./files/etc/serval/diskspace $(1)/etc/serval/diskspace
+
+	$(INSTALL_DIR) $(1)/serval-var
+	$(INSTALL_DATA) ./files/serval-var/serval.conf $(1)/serval-var
+
+	$(INSTALL_DIR) $(1)/dos
+	$(INSTALL_DATA) ./files/dos/deviceid $(1)/dos
+endef
+
+$(eval $(call BuildPackage,serval-dna))
