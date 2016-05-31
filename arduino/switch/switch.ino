@@ -19,13 +19,8 @@ void setup() {
   pinMode(switchPin, INPUT);
   digitalWrite(switchPin, HIGH);
 
-  // Set up Console for debugging
+  // Set up Bridge to pass data to Linux board
   Bridge.begin();
-  Console.begin();
-
-  while (!Console);
-
-  Console.println("Console is connected.");
 }
 
 void loop() {
@@ -34,19 +29,13 @@ void loop() {
   // Only act when the state of the switch changes
   String dataString = "";
   if (newSwitchState != switchState) {
-    Console.print("Switch state changed to ");
     if (newSwitchState == HIGH) {
       dataString.concat("0");
       digitalWrite(ledPin, LOW);
-      Console.print("off"); 
     } else {
       dataString.concat("1");
-      digitalWrite(ledPin, HIGH);
-      Console.print("on"); 
+      digitalWrite(ledPin, HIGH); 
     } 
-    Console.print(". ");
-    Console.print("Time: ");
-    Console.println(getTimeStamp());
 
     dataString.concat(",");
     dataString.concat(getTimeStamp());
@@ -56,10 +45,8 @@ void loop() {
     if(outputFile){
       outputFile.println(dataString);
       outputFile.close();
-      Console.print("Data successfully written to File: ");
-      Console.println("Datastring: " + dataString);
     } else {
-      Console.println("Data write unsuccessful.");
+      // Log error?
     }
 
     // Store the state of the switch
