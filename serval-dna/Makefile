@@ -200,6 +200,9 @@ define Package/serval-dna/install
 
 	$(INSTALL_DIR) $(1)/serval-var
 	$(INSTALL_DATA) ./files/serval-var/serval.conf $(1)/serval-var
+
+	$(INSTALL_DIR) $(1)/dos
+	$(INSTALL_DATA) ./files/dos/switch_values $(1)/dos
 endef
 
 $(eval $(call BuildPackage,serval-dna))
