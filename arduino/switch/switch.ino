@@ -5,6 +5,9 @@
 
 /*
  * A simple program to read a switch connected to a Mesh Extender
+ * 
+ * Switch values are read and, when changed, written to a file with the 
+ * timestamp. These are then read by meshmsresponder.
  */
 
 // Define variables
@@ -26,13 +29,20 @@ void setup() {
 void loop() {
   newSwitchState = digitalRead(switchPin);
 
+  /* Due to the pull-up resistor being on the switchPin, 
+   * switchState is reversed to what would be expected 
+   * High == switch is open, Low == switch is closed 
+   */
+
   // Only act when the state of the switch changes
   String dataString = "";
   if (newSwitchState != switchState) {
     if (newSwitchState == HIGH) {
+      // Switch is open
       dataString.concat("0");
       digitalWrite(ledPin, LOW);
     } else {
+      // Switch is closed
       dataString.concat("1");
       digitalWrite(ledPin, HIGH); 
     } 
@@ -52,21 +62,36 @@ void loop() {
     // Store the state of the switch
     switchState = newSwitchState;
   }
-  delay(1000);
+  delay(500);
 }
 
+/*
+ * Switch value, date and time are comma separated for easy processing by meshmsresponder
+ */
 String getTimeStamp(){
+  // Timestamp format: 0,1/1/1970,00:01
   String timeStamp;
   timeStamp.concat(day());
   timeStamp.concat("/");
   timeStamp.concat(month());
   timeStamp.concat("/");
   timeStamp.concat(year());
-  timeStamp.concat(" ");
-  timeStamp.concat(hour());
+  timeStamp.concat(",");
+  timeStamp.concat(formatTime(hour()));
   timeStamp.concat(":");
-  timeStamp.concat(minute());
-  timeStamp.concat(":");
-  timeStamp.concat(second());
+  timeStamp.concat(formatTime(minute()));
   return timeStamp;
 }
+
+/*
+ * TimeLib returns single digits for single digit times ie. 10:03 becomes 10:3
+ * Concatenate a "0" in fromt of single digit numbers for better output.
+ */
+String formatTime(int number){
+  if(number <= 9){
+    String formattedNumber = "0";
+    formattedNumber.concat(number);
+    return formattedNumber;
+  }
+}
+
