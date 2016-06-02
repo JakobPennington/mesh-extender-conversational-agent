@@ -30,6 +30,13 @@ for subscribersid in $(cat /dos/subscribers.sid); do
     fi
 done  
 
+if [ -e /dos/objecttype ]; then
+  objecttype=$(cat /dos/objecttype);
+else
+  objecttype="generic";
+  echo "objecttype" > /dos/objecttype
+fi
+
 rm /tmp/messages
 /serval/servald meshms list messages $me $them  | awk -F: '{ if ($4 == "<" && $2 > '$readoffset') print $5; }' | sed -e 's/[^a-z|A-Z|0-9| ]//g' -e 's/ /./g' | sed -n '1!G;h;$p' >/tmp/messages
 for command in $(cat /tmp/messages); do
@@ -81,7 +88,7 @@ for command in $(cat /tmp/messages); do
                        /serval/servald stop
                        sleep 1
 
-                       /serval/servald keyring set did $(/serval/servald keyring list | tail -1 | cut -f1 -d:) "${arg}" "$(/serval/servald keyring list | tail -1 | cut -f3 -d:)"
+                       /serval/servald keyring set did $(/serval/servald keyring list | tail -1 | cut -f1 -d:) "$(/serval/servald keyring list | tail -1 | cut -f2 -d:)" "${arg}"
 
                        sleep 5
                        reboot=1
@@ -222,6 +229,71 @@ for command in $(cat /tmp/messages); do
                   message="You no longer an administrator of this node"
                 else
                   message="You are not an administrator for this node"
+                fi
+
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        status ) # Read the current value of the sensor.
+                if [ -e /dos/switch_values ]; then
+                  sensor_value=$(cat /dos/switch_values | tail -1 | cut -d',' -f1)
+                  date=$(cat /dos/switch_values | tail -1 | cut -d',' -f2)
+                  time=$(cat /dos/switch_values | tail -1 | cut -d',' -f3)
+
+                  case $objecttype in
+                    gate)
+                      if [ "$sensor_value" == 0 ]; then
+                        message="This gate is currently open. Last opened at ${time} on ${date}"
+                      else
+                        message="This gate is currently closed. Last closed at ${time} on ${date}"
+                      fi
+                      ;;
+                    generic)
+                      if [ "$sensor_value" == 0 ]; then
+                        message="This switch is currently open. Last opened at ${time} on ${date}."
+                      else
+                        message="This switch is currently closed. Last closed at ${time} on ${date}."
+                      fi
+                      ;;
+                    trap)
+                      if [ "$sensor_value" == 0 ]; then
+                        message="This trap has been triggered. Last triggered at ${time} on ${date}"
+                      else
+                        message="This trap is still set. Last set at ${time} on ${date}"
+                      fi
+                      ;;
+                  esac
+                else
+                  message="No sensor is available on this device"
+                fi
+
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        settype ) # Set the type of object
+                if [ "$monitor" == 1 ]; then
+                    if [ -n "$arg" ]; then
+                        for type in $(cat /dos/supported_objects); do
+                          if [ "$arg" == "$type" ]; then
+                            echo "$arg" > /dos/objecttype
+                            message="The object is now recognised as a ${arg}."
+                            break;
+                          else
+                            message="That object type is not supported. Supported objects are: $(cat /dos/supported_objects)"
+                          fi
+                      done
+                    else
+                        message="Please specify a valid object type. Example: settype gate"
+                    fi
+                else
+                    message="You are not authorised to use this function"
+                fi
+                /serval/servald meshms send message $me $them "${message}"
+                ;;
+        unsettype ) # Reset the type of object. Object will be treated as a simple switch.
+                if [ "$monitor" == 1 ]; then
+                  echo "generic" > /dos/objecttype
+                  message="This object type has been reset to a generic switch"
+                else
+                  message="You are not authorised to use this function"
                 fi
 
                 /serval/servald meshms send message $me $them "${message}"
