@@ -6,10 +6,10 @@ START=49
 start() {
   # Clear out old inittab incase it tries to include ttyATH0
   # atleast that way a reboot will get things working.
-  if [ -e /overlay/etc/inittab ]; then
-    rm /overlay/etc/inittab
-    reboot
-  fi
+  #if [ -e /overlay/etc/inittab ]; then
+  #  rm /overlay/etc/inittab
+  #  reboot
+  #fi
 
   # Start servald
   export SERVALINSTANCE_PATH=/serval-var
@@ -24,14 +24,14 @@ start() {
   /etc/serval/otaupdate &
 
   # Run lbard, if installed
-  lbard=$(opkg list | grep serval-lbard | wc -l)
-  if [ $lbard == 1 ]; then
-    /etc/serval/runlbard &
-  fi
+  #lbard=$(opkg list | grep serval-lbard | wc -l)
+  #if [ $lbard == 1 ]; then
+  #  /etc/serval/runlbard &
+  #fi
 }
 
 stop() {
   export SERVALINSTANCE_PATH=/serval-var
   /serval/servald stop
-  pkill runlbard lbard
+  #pkill runlbard lbard
 }
