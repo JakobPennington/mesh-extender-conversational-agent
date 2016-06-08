@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Update captive portal
+if [ ! -e captive-portal ]; then
+  git clone https://github.com/cvirieux/servalProject captive-portal
+  ln -sf ../../../captive-portal/www serval-dna/files/serval/www
+else
+  cd captive-portal
+  git pull
+  cd ..
+fi
+
+# Retrieve latest version of serval apk
+wget -O ./serval-dna/files/serval/www/software/android/servalmesh.apk http://developer.servalproject.org/files/serval.apk
