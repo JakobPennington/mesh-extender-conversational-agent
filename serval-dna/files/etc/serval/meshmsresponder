@@ -31,10 +31,10 @@ for subscribersid in $(cat /dos/subscribers.sid); do
 done  
 
 if [ -e /dos/objecttype ]; then
-  objecttype=$(cat /dos/objecttype);
+  objecttype=$(cat /dos/object_type);
 else
   objecttype="generic";
-  echo "objecttype" > /dos/objecttype
+  echo "objecttype" > /dos/object_type
 fi
 
 rm /tmp/messages
@@ -273,7 +273,7 @@ for command in $(cat /tmp/messages); do
                     if [ -n "$arg" ]; then
                         for type in $(cat /dos/supported_objects); do
                           if [ "$arg" == "$type" ]; then
-                            echo "$arg" > /dos/objecttype
+                            echo "$arg" > /dos/object_type
                             message="The object is now recognised as a ${arg}."
                             break;
                           else
@@ -290,7 +290,7 @@ for command in $(cat /tmp/messages); do
                 ;;
         unsettype ) # Reset the type of object. Object will be treated as a simple switch.
                 if [ "$monitor" == 1 ]; then
-                  echo "generic" > /dos/objecttype
+                  echo "generic" > /dos/object_type
                   message="This object type has been reset to a generic switch"
                 else
                   message="You are not authorised to use this function"
