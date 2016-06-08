@@ -9,6 +9,12 @@ sleep 10
 counter=0
 
 while true; do
+  # Quick and dirty wat yo make sure the uhttpd server is running
+  uhttpd=$(ps | grep uhttpd | grep -v grep | wc -l)
+  echo "$uhttpd"
+  if [ "$uhttpd" == 0 ]; then
+    /etc/init.d/uhttpd start
+  fi
 
   # Make sure the USB is mounted correctly. If not, power off then on the USB and remount partitions.
   mounts=$(mount | grep '/serval\|/dos' | wc -l)
