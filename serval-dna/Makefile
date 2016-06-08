@@ -22,7 +22,7 @@ define Package/serval-dna
 	SECTION:=net
 	CATEGORY:=Network
 	SUBMENU:=Mesh networking
-	DEPENDS:=+librt +fdisk +libext2fs +e2fsprogs +libcom_err
+	DEPENDS:=+librt +fdisk +libext2fs +e2fsprogs +libcom_err +uhttpd +dnsmasq
 	MAINTAINER:=Serval DNA Maintainer <serval-dna@servalproject.org>
 endef
 
@@ -132,10 +132,8 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
         /etc/init.d/servald enable
 	echo "Enabling rc.d symlink for wirelesssetup"
 	/etc/init.d/wirelesssetup enable
-	#echo "Enabling rc.d symlink for captiveportal"
-	#/etc/init.d/captiveportal enable
-	#echo "Enabling rc.d symling for chilli"
-	#/etc/init.d/chilli enable
+	echo "Enabling rc.d symlink for captiveportal"
+	/etc/init.d/captiveportal enable
 fi
 exit 0
 endef
@@ -148,10 +146,8 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
         /etc/init.d/servald disable
 	echo "Removing rc.d symlink for wirelesssetup"
 	/etc/init.d/wirelesssetup disable
-	#echo "Removing rc.d symlink for capriveportal
-	#/etc/init.d/captiveportal disabe
-	#echo "Removing rc.d symlink for chilli"
-	#/etc/init.d/chilli disable
+	echo "Removing rc.d symlink for captiveportal
+	/etc/init.d/captiveportal disabe
 fi
 exit 0
 endef
@@ -166,12 +162,37 @@ define Package/serval-dna/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/servald $(1)/serval
 
 	$(INSTALL_DIR) $(1)/serval/www
-	$(INSTALL_DATA) ./files/serval/www/index.html $(1)/serval/www
-	$(INSTALL_DATA) ./files/serval/www/index-helpdesk-template.html $(1)/serval/www
-	$(INSTALL_DATA) ./files/serval/www/index-nohelpdesk-template.html $(1)/serval/www
-	
+	$(INSTALL_DATA) ./files/serval/www/index* $(1)/serval/www
+
+	$(INSTALL_DIR) $(1)/serval/www/css
+	$(INSTALL_DATA) ./files/serval/www/css/* $(1)/serval/www/css
+
+	$(INSTALL_DIR) $(1)/serval/www/fonts
+	$(INSTALL_DATA) ./files/serval/www/fonts/* $(1)/serval/www/fonts
+
+	$(INSTALL_DIR) $(1)/serval/www/images
+	$(INSTALL_DATA) ./files/serval/www/images/* $(1)/serval/www/images
+
+	$(INSTALL_DIR) $(1)/serval/www/js
+	$(INSTALL_DATA) ./files/serval/www/js/* $(1)/serval/www/js
+
 	$(INSTALL_DIR) $(1)/serval/www/software/android
-	$(INSTALL_DATA) ./files/serval/www/software/android/servalmesh.apk $(1)/serval/www/software/android/servalmesh.apk
+	$(INSTALL_DATA) ./files/serval/www/software/android/* $(1)/serval/www/software/android
+
+	$(INSTALL_DIR) $(1)/serval/www/software/ios
+	$(INSTALL_DATA) ./files/serval/www/software/ios/* $(1)/serval/www/software/ios
+
+	$(INSTALL_DIR) $(1)/serval/www/software/linux
+	$(INSTALL_DATA) ./files/serval/www/software/linux/* $(1)/serval/www/software/linux
+
+	$(INSTALL_DIR) $(1)/serval/www/software/osx
+	$(INSTALL_DATA) ./files/serval/www/software/osx/* $(1)/serval/www/software/osx
+
+	$(INSTALL_DIR) $(1)/serval/www/software/source
+	$(INSTALL_DATA) ./files/serval/www/software/source/index.html $(1)/serval/www/software/source
+
+	$(INSTALL_DIR) $(1)/serval/www/software/windows
+	$(INSTALL_DATA) ./files/serval/www/software/windows/* $(1)/serval/www/software/windows
 
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_DATA) ./files/etc/profile $(1)/etc
@@ -183,14 +204,13 @@ define Package/serval-dna/install
 	$(INSTALL_DATA) ./files/etc/config/system $(1)/etc/config
 	$(INSTALL_DATA) ./files/etc/config/wireless.template $(1)/etc/config
 	$(INSTALL_DATA) ./files/etc/config/dhcp $(1)/etc/config
-	#$(INSTALL_DATA) ./files/etc/config/uhttpd $(1)/etc/config
+	$(INSTALL_DATA) ./files/etc/config/uhttpd $(1)/etc/config
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/servald $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/dropbear $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/wirelesssetup $(1)/etc/init.d
-	#$(INSTALL_BIN) ./files/etc/init.d/chilli $(1)/etc/init.d
-	#$(INSTALL_BIN) ./files/etc/init.d/captiveportal $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/etc/init.d/captiveportal $(1)/etc/init.d
 
 	$(INSTALL_DIR) $(1)/etc/serval
 	$(INSTALL_BIN) ./files/etc/serval/runservald $(1)/etc/serval
